@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This file is protected by Copyright. Please refer to the COPYRIGHT file
+distributed with this source distribution.
+
+This file is part of REDHAWK core.
+
+REDHAWK core is free software: you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+REDHAWK core is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with this program.  If not, see http://www.gnu.org/licenses/.
+-->
+<!DOCTYPE softwareassembly PUBLIC "-//JTRS//DTD SCA V2.2.2 SAD//EN" "softwareassembly.dtd">
+<softwareassembly id="DCE:a3d0c1c5-05fd-4c7d-beb5-38fdbd575b2d" name="TestComplexPropsSADOverrides">
+  <componentfiles>
+    <componentfile id="TestComplexProps_3345fe14-0f29-47d1-89db-b4aab87d9d1d" type="SPD">
+      <localfile name="/components/TestComplexProps/TestComplexProps.spd.xml"/>
+    </componentfile>
+  </componentfiles>
+  <partitioning>
+    <componentplacement>
+      <componentfileref refid="TestComplexProps_3345fe14-0f29-47d1-89db-b4aab87d9d1d"/>
+      <componentinstantiation id="TestComplexProps_1" startorder="0">
+        <usagename>TestComplexProps_1</usagename>
+        <componentproperties>
+          <simpleref refid="complexBooleanProp" value="1+j0"/>
+          <simpleref refid="complexCharProp" value="2+j3"/>
+          <simpleref refid="complexShortProp" value="2+j3"/>
+          <simpleref refid="complexFloatProp" value="2+j3"/>
+          <simpleref refid="complexUShort" value="2+j3"/>
+          <simpleref refid="complexLongLong" value="2+j3"/>
+          <simpleref refid="complexDouble" value="2+j3"/>
+          <simpleref refid="complexOctetProp" value="2+j3"/>
+          <simpleref refid="complexULongProp" value="2+j3"/>
+          <simpleref refid="complexULongLong" value="2+j3"/>
+          <simpleref refid="complexLong" value="2+j3"/>
+          <structref refid="complexFloatStruct">
+            <simplesequenceref refid="complexFloatStruct::complex_float_seq">
+                <values>
+                    <value>-5+j5</value>
+                    <value>9-j8</value>
+                    <value>-13-j24</value>
+                    <value>21-j22</value>
+                    <value>31</value>
+                    <value>j431</value>
+                    <value>-j567</value>
+                    <value>-3567</value>
+                    <value>-5.25+j5.25</value>
+                    <value>9.25-j8.25</value>
+                </values>
+            </simplesequenceref>
+          </structref>
+          <simplesequenceref refid="complexFloatSequence">
+              <values>
+                  <value>1+j2</value>
+                  <value>10+j20</value>
+              </values>
+          </simplesequenceref>
+          <structsequenceref refid="complexFloatStructSequence">
+              <structvalue>
+                <simpleref refid="complexFloatStructSequenceMemberMemember" value="32+j33"/>
+                <simplesequenceref refid="complexFloatStructSequence::complex_float_seq">
+                    <values>
+                        <value>45+j55</value>
+                        <value>69+j78</value>
+                    </values>
+                </simplesequenceref>
+              </structvalue>
+              <structvalue>
+                <simpleref refid="complexFloatStructSequenceMemberMemember" value="42+j43"/>
+                <simplesequenceref refid="complexFloatStructSequence::complex_float_seq">
+                    <values>
+                        <value>145+j155</value>
+                        <value>169+j178</value>
+                        <value>279+j998</value>
+                    </values>
+                </simplesequenceref>
+              </structvalue>
+          </structsequenceref>
+        </componentproperties>
+        <findcomponent>
+          <namingservice name="TestComplexProps_1"/>
+        </findcomponent>
+      </componentinstantiation>
+    </componentplacement>
+  </partitioning>
+  <assemblycontroller>
+    <componentinstantiationref refid="TestComplexProps_1"/>
+  </assemblycontroller>
+</softwareassembly>

@@ -1,0 +1,388 @@
+variables:
+  rpm_release: "0.$CI_PIPELINE_ID"
+  specfile: $project.spec
+  other_repos: $s3_repo_url/redhawk-dependencies/redhawk-dependencies
+  redhawk_version: '2.2.6'
+  # The REDHAWK branch variable tracks the mainline branch from which a topic
+  # branch was forked, allowing it to still trigger that branch's test pipeline
+  redhawk_branch: 'develop-2.2'
+  # By default, pull dependencies from the REDHAWK branch, but should there be
+  # a need to use a different set, override that here
+  redhawk_deps: $redhawk_branch
+  commit: $CI_COMMIT_SHA
+  datetime: ""
+
+stages:
+ - package-redhawk-codegen
+ - package-bulkio-gpp
+ - package-burstio-fei
+ - abi
+ - deploy
+
+.rpmbuild: &rpmbuild
+  image: ${docker_registry}utils/docker:latest-git
+  tags:
+    - cf
+    - docker
+  script:
+    # Use RPM release from specfile if this is a tag
+    - if [ -n "$CI_COMMIT_TAG" ]; then rpm_release=""; fi
+    - if [ -f output/repo.tar.gz ]; then cd output; tar xvf repo.tar.gz; cd -; cp -r output $project; fi
+    - cd $project
+    - echo "commit hash => ${commit:0:8}"
+    - datetime=$(git show -s --format=%cd ${commit})
+    - echo "commit date => ${datetime}"
+    - printf "FROM ${docker_registry}${rpmbuild_repository}rpmbuild:${dist}-${arch}-onbuild" > Dockerfile
+    # Don't build redhawk tests as part of rpmbuild to save time
+    - if [ "$project" == "redhawk" ]; then sed -i 's|testing||' src/Makefile.am; fi
+    - proj_lower=$(echo $project | tr '[:upper:]' '[:lower:]')
+    - safe_ref=$(echo ${CI_COMMIT_REF_NAME} | tr -d /| tr '[:upper:]' '[:lower:]')
+    - docker login ${docker_registry} -u ${docker_user} -p ${docker_password}
+    - docker build --tag=${docker_registry}redhawk-rpmbuild:$proj_lower-$safe_ref-${dist}-${arch}
+                   --pull
+                   --no-cache
+                   --build-arg "commit=${commit:0:8}"
+                   --build-arg "datetime=${datetime}"
+                   --build-arg "project=$project"
+                   --build-arg "arch=$arch"
+                   --build-arg "spec_file=$specfile"
+                   --build-arg "rpm_release=$rpm_release"
+                   --build-arg "other_repos=${other_repos}/yum/${redhawk_deps}/$dist/$arch"
+                   --build-arg "local_repo=$local_repo" .
+    # Create a yum repository from the packages we just built and any packages we've built in a previous stage
+    - id=$(docker create -it ${docker_registry}redhawk-rpmbuild:$proj_lower-$safe_ref-$dist-$arch bash -lc 'mkdir -p /tmp/repo;
+                                                for file in `find /usr/src/yum /root/rpmbuild/RPMS -name '*.rpm'`; do
+                                                cp -v $file /tmp/repo;
+                                                done;
+                                                cd /tmp/repo;
+                                                createrepo .;
+                                                tar czf repo.tar.gz *')
+    - docker start -a $id
+    # Cleanup any previous output we've inherited
+    - cd $CI_PROJECT_DIR
+    - rm -rf output && mkdir output
+    - docker cp $id:/tmp/repo/repo.tar.gz output/repo.tar.gz
+    - docker rm -f $id || true
+    - cd output
+    - tar xf repo.tar.gz
+    - cd $CI_PROJECT_DIR
+  artifacts:
+    name: $CI_JOB_NAME
+    paths:
+      - output/
+    expire_in: 2 days
+  except:
+    - master
+    - /^(\d+\.)?(\d+)?(\.\d+)$/
+
+redhawk:el6:
+  stage: package-redhawk-codegen
+  variables:
+    dist: el6
+    arch: x86_64
+    project: redhawk
+    specfile: src/releng/redhawk.spec
+    local_repo: ""
+  <<: *rpmbuild
+
+redhawk-codegen:el6:
+  stage: package-redhawk-codegen
+  variables:
+    dist: el6
+    arch: x86_64
+    project: redhawk-codegen
+    local_repo: ""
+  <<: *rpmbuild
+
+bulkio:el6:
+  stage: package-bulkio-gpp
+  dependencies:
+    - redhawk:el6
+  variables:
+    dist: el6
+    arch: x86_64
+    project: bulkioInterfaces
+    local_repo: output
+  <<: *rpmbuild
+
+gpp:el6:
+  stage: package-bulkio-gpp
+  dependencies:
+    - redhawk:el6
+  variables:
+    dist: el6
+    arch: x86_64
+    project: GPP
+    local_repo: output
+  <<: *rpmbuild
+
+burstio:el6:
+  stage: package-burstio-fei
+  dependencies:
+    - bulkio:el6
+  variables:
+    dist: el6
+    arch: x86_64
+    project: burstioInterfaces
+    local_repo: output
+  <<: *rpmbuild
+
+frontend:el6:
+  stage: package-burstio-fei
+  dependencies:
+    - bulkio:el6
+  variables:
+    dist: el6
+    arch: x86_64
+    project: frontendInterfaces
+    version: $fei_version
+    local_repo: output
+  <<: *rpmbuild
+
+redhawk:el7:
+  stage: package-redhawk-codegen
+  variables:
+    dist: el7
+    arch: x86_64
+    project: redhawk
+    specfile: src/releng/redhawk.spec
+    local_repo: ""
+  <<: *rpmbuild
+
+redhawk-codegen:el7:
+  stage: package-redhawk-codegen
+  variables:
+    dist: el7
+    arch: x86_64
+    project: redhawk-codegen
+    local_repo: ""
+  <<: *rpmbuild
+
+bulkio:el7:
+  stage: package-bulkio-gpp
+  dependencies:
+    - redhawk:el7
+  variables:
+    dist: el7
+    arch: x86_64
+    project: bulkioInterfaces
+    local_repo: output
+  <<: *rpmbuild
+
+gpp:el7:
+  stage: package-bulkio-gpp
+  dependencies:
+    - redhawk:el7
+  variables:
+    dist: el7
+    arch: x86_64
+    project: GPP
+    local_repo: output
+  <<: *rpmbuild
+
+burstio:el7:
+  stage: package-burstio-fei
+  dependencies:
+    - bulkio:el7
+  variables:
+    dist: el7
+    arch: x86_64
+    project: burstioInterfaces
+    local_repo: output
+  <<: *rpmbuild
+
+frontend:el7:
+  stage: package-burstio-fei
+  dependencies:
+    - bulkio:el7
+  variables:
+    dist: el7
+    arch: x86_64
+    project: frontendInterfaces
+    local_repo: output
+  <<: *rpmbuild
+
+deploy:
+  image: ${docker_registry}centos:7
+  stage: deploy
+  dependencies: []
+  before_script:
+    - echo "Deploying to $jenkins_url/job/$CI_PROJECT_NAMESPACE/job/$CI_PROJECT_NAME-`basename $CI_COMMIT_REF_NAME`"
+  script:
+    - if [ -n "$jenkins_url" ]; then
+        curl --insecure -X POST $jenkins_url/job/$CI_PROJECT_NAMESPACE/job/$CI_PROJECT_NAME-`basename $CI_COMMIT_REF_NAME`/buildWithParameters?pipeline_id=$CI_PIPELINE_ID --user $jenkins_user:$jenkins_api_token;
+      fi
+  except:
+    - /^(\d+\.)?(\d+)?(\.\d+)$/
+    - master
+
+# Trigger separate tests pipeline
+.trigger-common: &trigger-common
+  image: ${docker_registry}centos:7
+  stage: deploy
+  dependencies: []
+  variables:
+    # Default to the redhawk branch named in the global variables, which will
+    # typically be a develop branch. Feature branches trigger a test pipeline
+    # using the develop branch from which they were forked unless overridden
+    # here.
+    redhawk_testing_ref: $redhawk_branch
+  script:
+    - curl --insecure -X POST -F ref=$redhawk_testing_ref
+                              -F token=$test_token
+                              -F "variables[triggering_ref]=$CI_COMMIT_SHA"
+                              -F "variables[triggering_ref_name]=$CI_COMMIT_REF_NAME"
+                              -F "variables[triggering_ref_slug]=$CI_COMMIT_REF_SLUG"
+                              $test_url
+
+# For bug/feature branches, require the developer to manually trigger the tests
+test-trigger:branch:
+  <<: *trigger-common
+  when: manual
+  only:
+    - branches
+  except:
+    - master
+    - /^develop.*$/
+
+# For develop branches, automatically trigger test pipeline
+test-trigger:develop:
+  <<: *trigger-common
+  only:
+    - /^develop.*$/
+
+test-trigger:release:
+  image: ${docker_registry}centos:7
+  stage: deploy
+  dependencies: []
+  variables:
+    redhawk_version: '2.2.5-rc1'
+  script:
+    - curl --insecure -X POST -F ref=$redhawk_version
+                              -F token=$test_token
+                              -F "variables[triggering_ref]=$CI_COMMIT_SHA"
+                              -F "variables[triggering_ref_name]=$CI_COMMIT_REF_NAME"
+                              -F "variables[output_name]=$CI_COMMIT_REF_NAME"
+                              $test_url
+  only:
+    - tags
+  except:
+    - /^(\d+\.)?(\d+)?(\.\d+)$/
+
+.abi-common: &abi-common
+  image: ${docker_registry}${rpmbuild_repository}rpmbuild:el7-x86_64
+  stage: abi
+  script:
+    - yum install -y libabigail
+    - curl -f -O "$s3_repo_url/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/yum/$s3_yum_location/el7/x86_64/${rpm_name}-{,debuginfo-}${base_ver_release}.el7.x86_64.rpm"
+    - if curl -f -O "$s3_repo_url/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/yum/$s3_yum_location/el7/x86_64/${rpm_name}-devel-${base_ver_release}.el7.x86_64.rpm"; then
+        devel="--devel-pkg1 ${rpm_name}-devel-${base_ver_release}.el7.x86_64.rpm";
+        devel="$devel --devel-pkg2 output/${rpm_name}-devel-*.el7.x86_64.rpm";
+      fi
+    - abipkgdiff ${rpm_name}-${base_ver_release}.el7.x86_64.rpm
+                 output/${rpm_name}-[0-9]*.el7.x86_64.rpm
+                 --debug-info-pkg1 ${rpm_name}-debuginfo-${base_ver_release}.el7.x86_64.rpm
+                 --debug-info-pkg2 output/${rpm_name}-debuginfo-*.el7.x86_64.rpm
+                 $devel
+      | tee ${rpm_name}-abi-results.txt || true
+  artifacts:
+    paths:
+      - $rpm_name-abi-results.txt
+    expire_in: 30 days
+
+redhawk:abi:
+  variables:
+    s3_yum_location: '2-2-0-rc5'
+    rpm_name: 'redhawk'
+    base_ver_release: '2.2.0-5'
+  dependencies:
+    - redhawk:el7
+  <<: *abi-common
+
+bulkio:abi:
+  variables:
+    s3_yum_location: '2-2-0-rc5'
+    rpm_name: 'bulkioInterfaces'
+    base_ver_release: '2.2.0-5'
+  dependencies:
+    - bulkio:el7
+  <<: *abi-common
+
+frontend:abi:
+  variables:
+    s3_yum_location: '2-2-0-rc5'
+    rpm_name: 'frontendInterfaces'
+    base_ver_release: '2.4.3-5'
+  dependencies:
+    - frontend:el7
+  <<: *abi-common
+
+burstio:abi:
+  variables:
+    s3_yum_location: '2-2-0-rc5'
+    rpm_name: 'burstioInterfaces'
+    base_ver_release: '2.2.0-5'
+  dependencies:
+    - burstio:el7
+  <<: *abi-common
+
+.s3: &s3
+  image: ${docker_registry}utils/s3cmd:el6-createrepo
+  stage: deploy
+  tags:
+    - s3
+  script:
+    - CI_COMMIT_REF_SLUG_NO_RC=${CI_COMMIT_REF_SLUG%-rc[0-9]*};
+    - mkdir -p $arch
+    - for file in `find output -name *.rpm`; do
+        cp $file $arch;
+      done
+    - createrepo $arch
+    - /usr/bin/s3cmd sync -F -v -P --delete-removed $arch s3://$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/yum/$CI_COMMIT_REF_SLUG/$dist/
+    - if [ "$CI_COMMIT_REF_SLUG_NO_RC" != "$CI_COMMIT_REF_SLUG" ]; then
+        /usr/bin/s3cmd sync -F -v -P --delete-removed $arch s3://$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/yum/$CI_COMMIT_REF_SLUG_NO_RC/$dist/;
+      fi
+    # Pull down dependencies to create aggregated "cf-and-deps" repo
+    - mkdir -p cf-and-deps/$arch
+    - curl ${s3_repo_url}/redhawk-dependencies/redhawk-dependencies/yum/${redhawk_deps}/$dist/$arch/redhawk-dependencies.repo > /etc/yum.repos.d/redhawk-dependencies.repo
+    - reposync --download_path=tmp
+               --newest-only
+               --repoid=redhawk-dependencies
+    - for file in `find tmp -name *.rpm`; do
+        cp $file cf-and-deps/$arch;
+      done
+    - for file in `find output -name *.rpm`; do
+        cp $file cf-and-deps/$arch;
+      done
+    - createrepo cf-and-deps/$arch
+    - cd cf-and-deps
+    - /usr/bin/s3cmd sync -F -v -P --delete-removed $arch s3://$CI_PROJECT_NAMESPACE/cf-and-deps/yum/$CI_COMMIT_REF_SLUG/$dist/
+  except:
+    - master
+    - /^(\d+\.)?(\d+)?(\.\d+)$/
+
+deploy-el7:
+  variables:
+    dist: el7
+    arch: x86_64
+  dependencies:
+    - redhawk:el7
+    - bulkio:el7
+    - burstio:el7
+    - frontend:el7
+    - gpp:el7
+    - redhawk-codegen:el7
+  <<: *s3
+
+deploy-el6:
+  variables:
+    dist: el6
+    arch: x86_64
+  dependencies:
+    - redhawk:el6
+    - bulkio:el6
+    - burstio:el6
+    - frontend:el6
+    - gpp:el6
+    - redhawk-codegen:el6
+  <<: *s3

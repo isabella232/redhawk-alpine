@@ -1,0 +1,63 @@
+#
+# Runs relative to burstio project
+#
+
+burstio_top=../../..
+burstio_libsrc_top=$burstio_top/src
+export LD_LIBRARY_PATH=$burstio_libsrc_top/cpp/.libs:$burstio_libsrc_top/java/.libs:${LD_LIBRARY_PATH}
+export PYTHONPATH=$burstio_libsrc_top/python:${PYTHONPATH}
+
+#
+#  Run Python based testing..
+#
+
+# work around for import issues with redhawk bitbuffer
+bbuffer_link="../../src/python/redhawk/bitbuffer.py"
+
+cleanup_redhawk_import() {
+  [ -L $bbuffer_link ] && rm "$bbuffer_link"
+  [ -f $bbuffer_link"c" ] && rm $bbuffer_link"c"
+}
+
+setup_redhawk_import() {
+
+  cleanup_redhawk_import
+
+  pushd ../../src/python/redhawk
+  ln -s $OSSIEHOME/lib/python/redhawk/bitbuffer.py bitbuffer.py
+  popd
+}
+
+with_xunit=
+if [ $# -gt 0 ];
+then
+   if [ "-with-xunit" == "${1##[-+]}" ];
+   then
+       with_xunit="--with-xunit"
+       shift
+   fi
+fi
+
+setup_redhawk_import
+
+cd python
+./runtests $with_xunit
+cd -
+
+# clean up
+cleanup_redhawk_import
+
+#
+#  Run Java unit tests
+#
+cd java
+./runtests $with_xunit
+cd -
+
+#
+#  Run C++ based testing
+#
+cd cpp
+./runtests $with_xunit
+cd -
+

@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+from distutils.core import setup
+
+setup(name='bulkioInterfaces',
+      version='@PACKAGE_VERSION@',
+      package_dir = {'': 'src/python'},
+      packages=['bulkio',
+                'bulkio.bulkioInterfaces',
+                'bulkio.bulkioInterfaces.BULKIO',
+                'bulkio.bulkioInterfaces.BULKIO.internal',
+                'bulkio.bulkioInterfaces.BULKIO__POA',
+                'bulkio.bulkioInterfaces.BULKIO__POA.internal']
+)

@@ -1,0 +1,7 @@
+.idlj/
+.idljni/
+.jars/
+cf/
+CFInterfaces.jar
+ossie/ossie.jar
+ossie/ossie-legacy.jar

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE softpkg PUBLIC "-//JTRS//DTD SCA V2.2.2 SPD//EN" "softpkg.dtd">
+<softpkg id="DCE:f9b90a82-6c2c-415e-aebb-9a25ecce3428" name="comp_snk" type="2.1.0">
+  <title></title>
+  <author>
+    <name>null</name>
+  </author>
+  <propertyfile type="PRF">
+    <localfile name="comp_snk.prf.xml"/>
+  </propertyfile>
+  <descriptor>
+    <localfile name="comp_snk.scd.xml"/>
+  </descriptor>
+  <implementation id="python">
+    <description>The implementation contains descriptive information about the template for a software resource.</description>
+    <code type="Executable">
+      <localfile name="python"/>
+      <entrypoint>python/comp_snk.py</entrypoint>
+    </code>
+    <programminglanguage name="Python"/>
+    <humanlanguage name="EN"/>
+    <runtime name="python" version="2.6.6"/>
+    <os name="Linux"/>
+  </implementation>
+</softpkg>

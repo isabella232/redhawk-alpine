@@ -1,0 +1,9 @@
+*.class
+*.jar
+*.lo
+*.la
+*.o
+*.pyc
+*~
+build/
+sdr/dom/mgr
